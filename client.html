@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <script src="/socket.io/socket.io.js"></script>
+      <script>
+
+      var socketio = io.connect();
+      //displays comments
+      socketio.on("message_to_client",function(data, username) {
+         //Append an HR thematic break and the escaped HTML of the new message
+         document.getElementById("chatlog").appendChild(document.createElement("hr"));
+         var element = document.createElement("b");
+         element.innerHTML = "<strong>"+username+": <strong>";
+         document.getElementById("chatlog").appendChild(element);
+         document.getElementById("chatlog").appendChild(document.createTextNode(data['message']));
+      });
+
+      //displays image in the chatlog from an image link a user provides
+      socketio.on("upload_to_client", function(file, username){
+         document.getElementById("chatlog").appendChild(document.createElement("hr"));
+         var element = document.createElement("b");
+         element.innerHTML = "<strong>"+username+": <strong>";
+         document.getElementById("chatlog").appendChild(element);
+         var x = document.createElement("IMG");
+         x.setAttribute("src", file);
+         document.getElementById("chatlog").appendChild(x);
+      });
+
+      //displays emoji in the chat log;
+      socketio.on("emoji_to_client", function(emoji, username){
+         document.getElementById("chatlog").appendChild(document.createElement("hr"));
+         var element = document.createElement("b");
+         element.innerHTML = "<strong>"+username+": <strong>";
+         document.getElementById("chatlog").appendChild(element);
+         document.getElementById("chatlog").appendChild(document.createTextNode(emoji));
+      });
+
+       socketio.on('login_to_client', function(data){
+       });
+
+      //creates a button for a user to click on to enter into a chatroom
+      socketio.on('create_room_to_client', function(room_name){   
+            document.getElementById('existing_chat').innerHTML += "<button id = '"+room_name+"' onclick = Password('"+room_name+"') >"+room_name+"</button>";
+      });
+
+      //displays all existing chats to a user
+      socketio.on('load_rooms_to_client',function(room_dict){
+         document.getElementById('existing_chat').innerHTML = "<h2>Join an existing chat room</h2>";
+         for(r in room_dict){
+            document.getElementById('existing_chat').innerHTML += "<button id = '"+r+"' onclick = Password('"+r+"')>"+r+"</button>"
+         }
+      });
+
+      //displays all the users in a chatroom
+      socketio.on('show_users_to_client', function(username, users_list,room_name){
+         document.getElementById("all_users").innerHTML = "Current users in the room:<br>";
+          for(u in users_list){
+               document.getElementById("all_users").innerHTML += "<div id = '" +users_list[u]+"'>"+users_list[u] + "<button onclick = Remove('"+users_list[u]+"','"+room_name+"')>Remove</button><button onclick = Ban('"+users_list[u]+"','"+room_name+"')>Ban</button><button onclick = sendPrivateMessage('"+users_list[u]+"')>Private Message</button></div>";
+            }
+            
+           });
+
+      //displays all users in a room;
+      socketio.on('join_to_client', function(username, users_list,room_name){
+         joinRoom(room_name);
+         document.getElementById("all_users").innerHTML = "Current users in the room:<br>";
+          for(u in users_list){
+               document.getElementById("all_users").innerHTML += "<div id = '" +users_list[u]+"'>"+users_list[u] + "<button onclick = Remove('"+users_list[u]+"','"+room_name+"')>Remove</button><button onclick = Ban('"+users_list[u]+"','"+room_name+"')>Ban</button><button onclick = sendPrivateMessage('"+users_list[u]+"','"+username+"')>Private Message</button></div>";
+            }
+      });
+
+      //if a room does not have a password allows the user to enter the room
+      socketio.on('no_password_to_client', function(room_name){
+         changeRoom(room_name);
+      });
+      
+      //prompts a user to enter a password for a password protected room
+      socketio.on('password_to_client', function(room_name){
+         var pass = prompt("Please enter a password");
+         socketio.emit('check_password', room_name, pass);
+      });
+
+      //if a user enters the correct password, allows them to enter the room
+      socketio.on('correct_password_to_client', function(room_name){
+         changeRoom(room_name);
+      });
+
+      //if a user does not have the correct password, alerts the user that they need to try again
+      socketio.on('incorrect_password_to_client', function(data){
+         alert('You entered an incorrect password. Please try again');
+      });
+
+      //takes a user back to the home page after they have been removed from a room
+      socketio.on('remove_to_client',function(data){
+         document.getElementById("create_chat").innerHTML = "<h1>Create a new chat room</h1>";
+         document.getElementById("create_chat").innerHTML += "<label id = 'create_label'>Enter chat room name</label><input type = 'text' id = 'new_room'>";
+          document.getElementById("create_chat").innerHTML += "<label id = 'password_label'>Password(leave blank to create a public room)</label><input type = 'password' id = 'password'>"
+         document.getElementById("create_chat").innerHTML += "<button id = 'create_button' onclick = 'createRoom()'>Create chat room</button>";
+         document.getElementById("exist").innerHTML = "<div id = 'existing_chat'></div>"
+         document.getElementById("existing_chat").innerHTML = "<h2>Or join an existing chat room</h2>";
+         loadRooms();
+         document.getElementById("name").innerHTML = "";
+         document.getElementById("room").innerHTML = "";
+         document.getElementById("all_users").innerHTML = "";
+         document.getElementById("messaging").innerHTML= "";
+         document.getElementById("chatlog").innerHTML = "";
+         alert("Someone removed you from the room!")
+      });
+
+      //takes a user back to the home page after they have been banned from a room
+      socketio.on('ban_to_client',function(data){
+         document.getElementById("create_chat").innerHTML = "<h1>Create a new chat room</h1>";
+         document.getElementById("create_chat").innerHTML += "<label id = 'create_label'>Enter chat room name</label><input type = 'text' id = 'new_room'>";
+          document.getElementById("create_chat").innerHTML += "<label id = 'password_label'>Password(leave blank to create a public room)</label><input type = 'password' id = 'password'>"
+         document.getElementById("create_chat").innerHTML += "<button id = 'create_button' onclick = 'createRoom()'>Create chat room</button>";
+         document.getElementById("exist").innerHTML = "<div id = 'existing_chat'></div>";
+         document.getElementById("existing_chat").innerHTML = "<h2>Or join an existing chat room</h2>";
+         loadRooms();
+         document.getElementById("name").innerHTML = "";
+         document.getElementById("room").innerHTML = "";
+         document.getElementById("all_users").innerHTML = "";
+         document.getElementById("messaging").innerHTML= "";
+         document.getElementById("chatlog").innerHTML = "";
+         alert("Someone banned you from the room!")
+      });
+
+      //if a user clicks on an existing room and they are banned from the room, a message pops up
+      socketio.on('ban_message', function(data){
+         alert("You are banned from this room. You cannot enter");
+      });
+
+      //when a user is private messaged, an alert with the sender and the message pops up
+      socketio.on('private_message_to_client', function(username, message){
+         var PM = username + " sent you a private message: " + message;
+         alert(PM);
+      });
+
+      //reloading a room after its name has been changed
+      socketio.on('rename_to_client', function(room_name,users_list){
+         document.getElementById("name").innerHTML = "<h3 id = 'heading'>You are in " + String(room_name) + "</h3";
+         document.getElementById("room").innerHTML = "<label>Rename the room</label><input type = 'text' id = 'rename_room'><button onclick = Rename('"+room_name+"')>Rename</button><br>";
+         document.getElementById("messaging").innerHTML = "<br>Message: <br>";
+         document.getElementById("messaging").innerHTML += "<input type='text' id='message_input'/><button onclick=sendMessage('"+room_name+"')>Send</button><br>";
+         document.getElementById("messaging").innerHTML += "<select id = 'emot'><option>&#9917</option><option>&#9924</option><option>&#9786</option><option>&#9785</option></select><button onclick = Emoji('"+room_name+"','"+username+"')>Send Emoji</button><br>";
+         document.getElementById("messaging").innerHTML += "<label>Enter link to send an image</label><input type = 'text' id = 'input'> <button id = 'image' onclick = upload('"+room_name+"','"+username+"')>Send Image</button><br>";
+         document.getElementById("create_chat").innerHTML = "";
+         document.getElementById("exist").innerHTML = "";
+         document.getElementById("room").innerHTML += "<button id = 'leaveroom' onclick = leaveRoom('"+room_name+"')>Leave Room</button><br><br>";
+         document.getElementById("all_users").innerHTML = "Current users in the room:<br>";
+          for(u in users_list){
+               document.getElementById("all_users").innerHTML += "<div id = '" +users_list[u]+"'>"+users_list[u] + "<button onclick = Remove('"+users_list[u]+"','"+room_name+"')>Remove</button><button onclick = Ban('"+users_list[u]+"','"+room_name+"')>Ban</button><button onclick = sendPrivateMessage('"+users_list[u]+"')>Private Message</button></div>";
+            }
+      });
+
+      //function for sending a message
+      function sendMessage(room_name){
+         var msg = document.getElementById("message_input").value;
+         socketio.emit("message_to_server", {message:msg},room_name, username);
+      }
+
+      //function for logging in
+      function login(){
+         username = document.getElementById("username").value;
+         if(!isNaN(username)){
+            alert("Please enter a username");
+            exit();
+         }
+         socketio.emit('login',username);
+         document.getElementById("user_label").innerHTML="";
+         document.getElementById("username").type = "hidden";
+         document.getElementById("login_button").innerHTML = "";
+         document.getElementById("create_chat").innerHTML = "<h1>Create a new chat room</h1>";
+         document.getElementById("create_chat").innerHTML += "<label id = 'create_label'>Enter chat room name</label><input type = 'text' id = 'new_room'>";
+         document.getElementById("create_chat").innerHTML += "<label id = 'password_label'>Password(leave blank to create a public room)</label><input type = 'password' id = 'password'>"
+         document.getElementById("create_chat").innerHTML += "<button id = 'create_button' onclick = 'createRoom()'>Create chat room</button>";
+         document.getElementById("exist").innerHTML = "<div id = 'existing_chat'></div>"
+         document.getElementById("existing_chat").innerHTML = "<h2>Or join an existing chat room</h2>";
+         loadRooms();
+      }
+
+      //function allows a user to enter a new chatroom name to create a new chatroom
+      function createRoom(){
+         var room_name = document.getElementById('new_room').value;
+         room_name = room_name.replace(/\s+/g, '');
+         if(!isNaN(room_name)){
+            alert("Please enter a name to create a new chat room");
+            exit();
+         }
+         var password = document.getElementById('password').value;
+         if(!isNaN(password)){
+            password = null;
+         }
+         socketio.emit('create_room',room_name, password);
+      }
+
+      //call to the server to load all the existing rooms
+      function loadRooms(){
+         socketio.emit('load_rooms',null);
+      }
+
+      //call to the server to allow a user to join a room
+      function changeRoom(room_name){
+         socketio.emit('join_room', room_name, username);
+            
+      }
+
+      //loads all the content of the chatroom
+      function joinRoom(room_name){
+         document.getElementById("name").innerHTML = "<h3 id = 'heading'>You are in " + String(room_name) + "</h3";
+         document.getElementById("room").innerHTML = "<label>Rename the room</label><input type = 'text' id = 'rename_room'><button onclick = Rename('"+room_name+"')>Rename</button><br>";
+         document.getElementById("messaging").innerHTML = "<br>Message: <br>";
+         document.getElementById("messaging").innerHTML += "<input type='text' id='message_input'/><button onclick=sendMessage('"+room_name+"')>Send</button><br>";
+         document.getElementById("messaging").innerHTML += "<select id = 'emot'><option>&#9917</option><option>&#9924</option><option>&#9786</option><option>&#9785</option></select><button onclick = Emoji('"+room_name+"','"+username+"')>Send Emoji</button><br>";
+         document.getElementById("messaging").innerHTML += "<label>Enter link to send an image</label><input type = 'text' id = 'input'> <button id = 'image' onclick = upload('"+room_name+"','"+username+"')>Send Image</button><br>";
+         document.getElementById("chatlog").innerHTML = "";
+         document.getElementById("create_chat").innerHTML = "";
+         document.getElementById("exist").innerHTML = "";
+         var msg = String(username) + " joined the room.";
+         socketio.emit("message_to_server", {message:msg},room_name, 'SERVER');
+         document.getElementById("room").innerHTML += "<button id = 'leaveroom' onclick = leaveRoom('"+room_name+"')>Leave Room</button><br><br>";
+      }
+
+      //loads the home page after a user decides to leave a chat room
+      function leaveRoom(room_name){
+         document.getElementById("create_chat").innerHTML = "<h1>Create a new chat room</h1>";
+         document.getElementById("create_chat").innerHTML += "<label id = 'create_label'>Enter chat room name</label><input type = 'text' id = 'new_room'>";
+          document.getElementById("create_chat").innerHTML += "<label id = 'password_label'>Password(leave blank to create a public room)</label><input type = 'password' id = 'password'>"
+         document.getElementById("create_chat").innerHTML += "<button id = 'create_button' onclick = 'createRoom()'>Create chat room</button>";
+         document.getElementById("exist").innerHTML = "<div id = 'existing_chat'></div>"
+         document.getElementById("existing_chat").innerHTML = "<h2>Or join an existing chat room</h2>";
+         loadRooms();
+         document.getElementById("name").innerHTML = ""
+         document.getElementById("room").innerHTML = "";
+         document.getElementById("all_users").innerHTML = "";
+         document.getElementById("messaging").innerHTML= "";
+         document.getElementById("chatlog").innerHTML = "";
+         socketio.emit('leave_room',room_name, username);
+         var msg = String(username) + " has left the room.";
+         socketio.emit("message_to_server", {message:msg},room_name, 'SERVER');
+      }
+
+      //calls the server to see if a password for the room exists
+      function Password(room_name){
+         socketio.emit('password',room_name);
+      }
+
+      //if one user decides to remove another user, this function calls the server to remove that user from the room
+      function Remove(user, room_name){
+         socketio.emit('remove',user, room_name);
+         var msg = String(username) + " removed " + String(user)+ " from the room";
+         socketio.emit("message_to_server", {message:msg},room_name, 'SERVER');
+      }
+
+      //if one user decides to ban another user, this function calls the server to remove that user from the room
+      function Ban(user,room_name){
+         socketio.emit('ban',user, room_name);
+         var msg = String(username) + " banned " + String(user)+ " from the room";
+         socketio.emit("message_to_server", {message:msg},room_name, 'SERVER');
+      }
+
+      //allows a user to enter a private message to a user in a chat room and send it
+      function sendPrivateMessage(user){
+         var message = prompt("Enter your private message here:")
+         socketio.emit('private_message', user, username, message);
+      }
+
+      //takes in the link of an image and sends it to the server to display to all users in the room
+      function upload(room_name, username){
+         var file = document.getElementById("input").value;
+         socketio.emit('upload',file, room_name, username);
+      }
+
+      //takes in the selected emoji and sends it to the server to display to all users in the room
+      function Emoji(room_name, username){
+         var emoji = document.getElementById("emot").value;
+         socketio.emit('emoji', emoji, room_name, username);
+      }
+
+      //calls server to change the name of the room and notify users that the room name has been changed
+      function Rename(room_name){
+         var new_name = document.getElementById("rename_room").value;
+         new_name = new_name.replace(/\s+/g, '');
+         socketio.emit('rename', room_name, String(new_name));
+         var msg = username + " changed the name of the room to " + new_name;
+         socketio.emit("message_to_server", {message:msg}, new_name, 'SERVER');
+      }
+
+      </script>
+      <title>Chat Room Website</title>
+   </head>
+   <body>
+      <label id = "user_label">Enter Username:</label><input type = "text" id = "username">
+      <div id = "login_button">
+      <button id = "login" onclick = "login()">Login</button>
+      </div>
+
+      <div id = "create_chat"></div>
+      <div id = "name"></div>
+      <div id = "messaging"> </div>
+      <div id="chatlog"></div>
+      <br>
+      <hr>
+      <div id = "all_users"></div>
+      <br>
+      <div id = "room"></div>
+      <div id = "exist"></div>
+      
+
+   </body>
+   </html>
